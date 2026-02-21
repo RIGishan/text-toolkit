@@ -6,6 +6,7 @@ import { IdGeneratorTool } from "../tools/dev/IdGeneratorTool";
 import { HashGeneratorTool } from "../tools/dev/HashGeneratorTool";
 import { JwtInspectorTool } from "../tools/dev/JwtInspectorTool";
 import { RegexSuiteTool } from "../tools/dev/RegexSuiteTool";
+import { JsonTableTool } from "../tools/dev/JsonTableTool";
 import { CsvJsonConverterTool } from "../tools/data/CsvJsonConverterTool";
 import { WhitespaceNormalizerTool } from "../tools/data/WhitespaceNormalizerTool";
 import { ExtractorsPackTool } from "../tools/data/ExtractorsPackTool";
@@ -111,6 +112,15 @@ export const toolsRegistry: ToolConfig[] = [
   description: "Test patterns, highlight matches, inspect groups, and use common regex templates.",
   keywords: ["regex", "regexp", "match", "highlight", "groups", "escape", "unescape"],
   Component: RegexSuiteTool,
+  defaultState: {}
+  },
+  {
+  id: "dev/json-to-table",
+  category: "Dev",
+  name: "JSON to Table Viewer",
+  description: "Render JSON data in a searchable table with column filters.",
+  keywords: ["json", "table", "viewer", "search", "filter", "rows", "columns"],
+  Component: JsonTableTool,
   defaultState: {}
   },
   {
