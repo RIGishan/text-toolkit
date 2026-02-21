@@ -4,7 +4,6 @@ import { Input } from "../../components/ui/Input";
 import { Button } from "../../components/ui/Button";
 
 type Row = Record<string, string>;
-type Row = Record<string, unknown>;
 
 type ParseResult =
   | { ok: true; rows: Row[]; columns: string[] }
@@ -30,9 +29,11 @@ function toDisplayValue(value: unknown): string {
 }
 
 function flattenValue(value: unknown, path: string, output: Row) {
+  const leafKey = path || "value";
+
   if (Array.isArray(value)) {
     if (value.length === 0) {
-      output[path] = "[]";
+      output[leafKey] = "[]";
       return;
     }
 
@@ -46,7 +47,7 @@ function flattenValue(value: unknown, path: string, output: Row) {
   if (value && typeof value === "object") {
     const entries = Object.entries(value as Record<string, unknown>);
     if (entries.length === 0) {
-      output[path] = "{}";
+      output[leafKey] = "{}";
       return;
     }
 
@@ -57,7 +58,7 @@ function flattenValue(value: unknown, path: string, output: Row) {
     return;
   }
 
-  output[path || "value"] = toDisplayValue(value);
+  output[leafKey] = toDisplayValue(value);
 }
 
 function flattenRow(input: unknown): Row {
@@ -72,21 +73,6 @@ function normalizeRows(input: unknown): Row[] {
   }
 
   return [flattenRow(input)];
-function normalizeRows(input: unknown): Row[] {
-  if (Array.isArray(input)) {
-    return input.map((item) => {
-      if (item && typeof item === "object" && !Array.isArray(item)) {
-        return item as Row;
-      }
-      return { value: item };
-    });
-  }
-
-  if (input && typeof input === "object") {
-    return [input as Row];
-  }
-
-  return [{ value: input }];
 }
 
 function parseJsonToRows(input: string): ParseResult {
@@ -125,7 +111,6 @@ export function JsonTableTool() {
 
     return parsed.rows.filter((row) => {
       const cells = Object.values(row);
-      const cells = Object.values(row).map(toDisplayValue);
 
       const matchesSearch = !query || cells.some((cell) => cell.toLowerCase().includes(query));
 
@@ -134,7 +119,6 @@ export function JsonTableTool() {
         (filterColumn === "all"
           ? cells.some((cell) => cell.toLowerCase().includes(columnQuery))
           : (row[filterColumn] ?? "").toLowerCase().includes(columnQuery));
-          : toDisplayValue(row[filterColumn]).toLowerCase().includes(columnQuery));
 
       return matchesSearch && matchesFilter;
     });
@@ -315,8 +299,6 @@ export function JsonTableTool() {
                         <td key={`${idx}-${col}`} className="max-w-[280px] border-t border-slate-100 px-3 py-2 align-top text-slate-700">
                           <div className="truncate" title={row[col] ?? ""}>
                             {row[col] ?? ""}
-                          <div className="truncate" title={toDisplayValue(row[col])}>
-                            {toDisplayValue(row[col])}
                           </div>
                         </td>
                       ))}
