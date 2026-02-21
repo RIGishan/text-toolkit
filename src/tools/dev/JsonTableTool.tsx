@@ -3,6 +3,7 @@ import { Textarea } from "../../components/ui/Textarea";
 import { Input } from "../../components/ui/Input";
 import { Button } from "../../components/ui/Button";
 
+type Row = Record<string, string>;
 type Row = Record<string, unknown>;
 
 type ParseResult =
@@ -28,6 +29,49 @@ function toDisplayValue(value: unknown): string {
   }
 }
 
+function flattenValue(value: unknown, path: string, output: Row) {
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      output[path] = "[]";
+      return;
+    }
+
+    value.forEach((item, index) => {
+      const nextPath = path ? `${path}[${index}]` : `[${index}]`;
+      flattenValue(item, nextPath, output);
+    });
+    return;
+  }
+
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (entries.length === 0) {
+      output[path] = "{}";
+      return;
+    }
+
+    entries.forEach(([key, child]) => {
+      const nextPath = path ? `${path}.${key}` : key;
+      flattenValue(child, nextPath, output);
+    });
+    return;
+  }
+
+  output[path || "value"] = toDisplayValue(value);
+}
+
+function flattenRow(input: unknown): Row {
+  const row: Row = {};
+  flattenValue(input, "", row);
+  return row;
+}
+
+function normalizeRows(input: unknown): Row[] {
+  if (Array.isArray(input)) {
+    return input.map((item) => flattenRow(item));
+  }
+
+  return [flattenRow(input)];
 function normalizeRows(input: unknown): Row[] {
   if (Array.isArray(input)) {
     return input.map((item) => {
@@ -80,6 +124,7 @@ export function JsonTableTool() {
     const columnQuery = filterValue.trim().toLowerCase();
 
     return parsed.rows.filter((row) => {
+      const cells = Object.values(row);
       const cells = Object.values(row).map(toDisplayValue);
 
       const matchesSearch = !query || cells.some((cell) => cell.toLowerCase().includes(query));
@@ -88,6 +133,7 @@ export function JsonTableTool() {
         !columnQuery ||
         (filterColumn === "all"
           ? cells.some((cell) => cell.toLowerCase().includes(columnQuery))
+          : (row[filterColumn] ?? "").toLowerCase().includes(columnQuery));
           : toDisplayValue(row[filterColumn]).toLowerCase().includes(columnQuery));
 
       return matchesSearch && matchesFilter;
@@ -267,6 +313,8 @@ export function JsonTableTool() {
                     <tr key={idx} className="odd:bg-white even:bg-slate-50/40">
                       {parsed.columns.map((col) => (
                         <td key={`${idx}-${col}`} className="max-w-[280px] border-t border-slate-100 px-3 py-2 align-top text-slate-700">
+                          <div className="truncate" title={row[col] ?? ""}>
+                            {row[col] ?? ""}
                           <div className="truncate" title={toDisplayValue(row[col])}>
                             {toDisplayValue(row[col])}
                           </div>
