@@ -1,82 +1,113 @@
 import { useMemo, useState } from "react";
+
+import { useToolContext } from "../../app/toolContext";
+import { useToolState } from "../../lib/useToolState";
+
 import { Button } from "../../components/ui/Button";
 import { Textarea } from "../../components/ui/Textarea";
 import { Toggle } from "../../components/ui/Toggle";
+
 import { downloadTextFile } from "../../lib/download";
 import { bytesOfUtf8, formatBytes } from "../../lib/text";
 import { useDebouncedValue } from "../../lib/useDebouncedValue";
 
 type LineEnding = "LF" | "CRLF";
 
-const WARN_AT = 2 * 1024 * 1024;
-const HARD_CAP = 5 * 1024 * 1024;
+const WARN_AT = 2 * 1024 * 1024; // 2 MB
+const HARD_CAP = 5 * 1024 * 1024; // 5 MB
 
 function detectLineEnding(text: string): {
   hasCRLF: boolean;
   hasLF: boolean;
   kind: "LF" | "CRLF" | "Mixed" | "None";
 } {
+  if (!text) return { hasCRLF: false, hasLF: false, kind: "None" };
+
   const hasCRLF = /\r\n/.test(text);
-  // Detect lone LF that isn't part of CRLF
-  const hasLF = /(?<!\r)\n/.test(text);
-  if (hasCRLF && hasLF) return { hasCRLF, hasLF, kind: "Mixed" };
-  if (hasCRLF) return { hasCRLF, hasLF, kind: "CRLF" };
-  if (hasLF) return { hasCRLF, hasLF, kind: "LF" };
-  return { hasCRLF, hasLF, kind: "None" };
+  // LF that is not part of CRLF: either start-of-string \n or any char except \r before \n
+  const hasLoneLF = /(^|[^\r])\n/.test(text);
+
+  const hasLF = hasLoneLF || (!hasCRLF && /\n/.test(text));
+
+  let kind: "LF" | "CRLF" | "Mixed" | "None" = "None";
+  if (hasCRLF && hasLF) kind = "Mixed";
+  else if (hasCRLF) kind = "CRLF";
+  else if (hasLF) kind = "LF";
+  else kind = "None";
+
+  return { hasCRLF, hasLF, kind };
 }
 
 function normalizeLineEndings(text: string, target: LineEnding): string {
-  // First normalize everything to LF
-  let t = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-  if (target === "CRLF") t = t.replace(/\n/g, "\r\n");
-  return t;
-}
-
-function removeTrailingSpacesPerLine(text: string): string {
-  // Remove spaces/tabs at end of each line
-  return text.replace(/[ \t]+$/gm, "");
-}
-
-function trimEachLine(text: string): string {
-  return text.replace(/^[ \t]+|[ \t]+$/gm, "");
-}
-
-function collapseBlankLines(text: string, maxBlankLines: number): string {
-  // maxBlankLines = number of consecutive blank lines allowed
-  // Example: 1 means at most 1 blank line between blocks.
-  const n = Math.max(0, Math.min(10, Math.floor(maxBlankLines)));
-  if (n === 0) {
-    // remove all blank lines
-    return text.replace(/^\s*[\r\n]+/gm, "").replace(/[\r\n]{2,}/g, "\n");
-  }
-
-  // Normalize to LF temporarily for easier handling
-  const lf = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-  // Replace runs of blank lines with limited count
-  const re = new RegExp(`(?:\\n[\\t ]*){${n + 1},}\\n`, "g");
-  const limited = lf.replace(re, "\n" + "\n".repeat(n));
-  return limited;
-}
-
-// NEW: extra features
-function normalizeInnerSpaces(text: string): string {
-  // Collapse runs of spaces/tabs into a single space
-  return text.replace(/[ \t]{2,}/g, " ");
+  // First normalize to LF, then map to target
+  let out = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  if (target === "CRLF") out = out.replace(/\n/g, "\r\n");
+  return out;
 }
 
 function ensureFinalNewline(text: string, target: LineEnding): string {
   if (!text) return text;
   const nl = target === "CRLF" ? "\r\n" : "\n";
-  return text.endsWith(nl) ? text : text + nl;
+  if (text.endsWith("\r\n") || text.endsWith("\n")) return text;
+  return text + nl;
+}
+
+function removeTrailingSpacesPerLine(text: string): string {
+  // Operate in LF internally
+  const lf = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  return lf
+    .split("\n")
+    .map((line) => line.replace(/[ \t]+$/g, ""))
+    .join("\n");
+}
+
+function trimEachLine(text: string): string {
+  const lf = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  return lf
+    .split("\n")
+    .map((line) => line.trim())
+    .join("\n");
+}
+
+function normalizeInnerSpaces(text: string): string {
+  // Collapse runs of spaces/tabs inside lines (does not touch newlines)
+  const lf = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  return lf
+    .split("\n")
+    .map((line) => line.replace(/[ \t]{2,}/g, " ").replace(/\t+/g, " "))
+    .join("\n");
+}
+
+function collapseBlankLines(text: string, maxBlanks: number): string {
+  const lf = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const cap = Math.max(0, Math.min(10, Math.floor(maxBlanks)));
+
+  const out: string[] = [];
+  let blankRun = 0;
+
+  for (const line of lf.split("\n")) {
+    const isBlank = line.trim().length === 0;
+    if (isBlank) {
+      blankRun += 1;
+      if (blankRun <= cap) out.push("");
+    } else {
+      blankRun = 0;
+      out.push(line);
+    }
+  }
+
+  return out.join("\n");
 }
 
 function sentencePerLine(text: string): string {
-  // Normalize to LF for splitting logic
+  // Very lightweight sentence split:
+  // - normalize internal newlines to spaces
+  // - split on . ! ? followed by whitespace
   const lf = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const flat = lf.replace(/\n+/g, " ").trim();
+  if (!flat) return "";
 
-  // Split when . ! ? is followed by whitespace/newline.
-  // Note: Not perfect for abbreviations (e.g., "Mr.", "e.g.") but works well for most paragraphs.
-  const parts = lf
+  const parts = flat
     .split(/(?<=[.!?])\s+/g)
     .map((s) => s.trim())
     .filter(Boolean);
@@ -95,38 +126,58 @@ function countStats(text: string): { lines: number; chars: number; bytes: number
 }
 
 export function WhitespaceNormalizerTool() {
-  const [input, setInput] = useState<string>(
-    "Hello there. This is a test! Does it split correctly? Yes it should.\r\n\r\nLine 1 with trailing spaces    \r\n  Line 2 has leading spaces\r\n\r\n\r\nLine 3\t\t\r\n"
-  );
+  const { toolId } = useToolContext();
 
-  const [targetEnding, setTargetEnding] = useState<LineEnding>("LF");
-  const [removeTrailing, setRemoveTrailing] = useState(true);
-  const [trimLines, setTrimLines] = useState(false);
-  const [collapseBlanks, setCollapseBlanks] = useState(true);
-  const [maxBlankLines, setMaxBlankLines] = useState(1);
+  const SAMPLE =
+    "Hello there.\n" +
+    "This is a test! Does it split correctly? Yes it should.\r\n\r\n" +
+    "Line 1 with trailing spaces \r\n" +
+    " Line 2 has leading spaces\r\n\r\n\r\n" +
+    "Line 3\t\t\r\n";
 
-  // NEW toggles
-  const [sentenceLines, setSentenceLines] = useState(false);
-  const [normalizeSpaces, setNormalizeSpaces] = useState(false);
-  const [finalNewline, setFinalNewline] = useState(false);
+  const [input, setInput] = useState<string>(SAMPLE);
+
+  const DEFAULTS = {
+    targetEnding: "LF" as LineEnding,
+    removeTrailing: true,
+    trimLines: false,
+    collapseBlanks: true,
+    maxBlankLines: 1,
+    sentenceLines: false,
+    normalizeSpaces: false,
+    finalNewline: false,
+  };
+
+  const [opts, setOpts] = useToolState(toolId, DEFAULTS);
+
+  const {
+    targetEnding,
+    removeTrailing,
+    trimLines,
+    collapseBlanks,
+    maxBlankLines,
+    sentenceLines,
+    normalizeSpaces,
+    finalNewline,
+  } = opts;
 
   const inputBytes = useMemo(() => bytesOfUtf8(input), [input]);
   const warnLarge = inputBytes > WARN_AT;
   const overCap = inputBytes > HARD_CAP;
 
   const debouncedInput = useDebouncedValue(input, 150);
-
   const detection = useMemo(() => detectLineEnding(debouncedInput), [debouncedInput]);
 
   const result = useMemo(() => {
     if (!debouncedInput) {
       return { ok: true as const, output: "", info: "Paste text to normalize." };
     }
+
     if (overCap) {
       return {
         ok: false as const,
         output: "",
-        error: `Input is ${formatBytes(inputBytes)} which exceeds the 5 MB cap. Reduce size to continue.`
+        error: `Input is ${formatBytes(inputBytes)} which exceeds the 5 MB cap. Reduce size to continue.`,
       };
     }
 
@@ -140,9 +191,7 @@ export function WhitespaceNormalizerTool() {
 
     if (removeTrailing) out = removeTrailingSpacesPerLine(out);
     if (trimLines) out = trimEachLine(out);
-
     if (normalizeSpaces) out = normalizeInnerSpaces(out);
-
     if (collapseBlanks) out = collapseBlankLines(out, maxBlankLines);
 
     // Apply target line endings at the end
@@ -162,7 +211,7 @@ export function WhitespaceNormalizerTool() {
     maxBlankLines,
     sentenceLines,
     targetEnding,
-    finalNewline
+    finalNewline,
   ]);
 
   const inStats = useMemo(() => countStats(input), [input]);
@@ -181,24 +230,15 @@ export function WhitespaceNormalizerTool() {
   }
 
   function reset() {
-    setInput(
-      "Hello there. This is a test! Does it split correctly? Yes it should.\r\n\r\nLine 1 with trailing spaces    \r\n  Line 2 has leading spaces\r\n\r\n\r\nLine 3\t\t\r\n"
-    );
-    setTargetEnding("LF");
-    setRemoveTrailing(true);
-    setTrimLines(false);
-    setNormalizeSpaces(false);
-    setCollapseBlanks(true);
-    setMaxBlankLines(1);
-    setSentenceLines(false);
-    setFinalNewline(false);
+    setInput(SAMPLE);
+    setOpts(DEFAULTS);
   }
 
   return (
-    <div className="grid gap-6">
+    <div className="grid gap-4">
       {/* Input */}
-      <div className="grid gap-3">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="grid gap-2">
+        <div className="flex items-baseline justify-between gap-3">
           <div className="text-sm font-semibold text-slate-900">Input</div>
           <div className="text-xs text-slate-500">
             Size: {formatBytes(inputBytes)}
@@ -250,14 +290,14 @@ export function WhitespaceNormalizerTool() {
             <div className="mt-2 flex gap-2">
               <Button
                 type="button"
-                onClick={() => setTargetEnding("LF")}
+                onClick={() => setOpts((p) => ({ ...p, targetEnding: "LF" }))}
                 className={targetEnding === "LF" ? "border-blue-500 bg-blue-50" : ""}
               >
                 LF (Unix)
               </Button>
               <Button
                 type="button"
-                onClick={() => setTargetEnding("CRLF")}
+                onClick={() => setOpts((p) => ({ ...p, targetEnding: "CRLF" }))}
                 className={targetEnding === "CRLF" ? "border-blue-500 bg-blue-50" : ""}
               >
                 CRLF (Windows)
@@ -272,17 +312,17 @@ export function WhitespaceNormalizerTool() {
             <div className="mt-2 grid gap-2">
               <Toggle
                 checked={sentenceLines}
-                onChange={setSentenceLines}
+                onChange={(v) => setOpts((p) => ({ ...p, sentenceLines: v }))}
                 label="Sentence per line (split on . ! ?)"
               />
               <Toggle
                 checked={normalizeSpaces}
-                onChange={setNormalizeSpaces}
+                onChange={(v) => setOpts((p) => ({ ...p, normalizeSpaces: v }))}
                 label="Normalize inner spaces (collapse multiple spaces/tabs)"
               />
               <Toggle
                 checked={finalNewline}
-                onChange={setFinalNewline}
+                onChange={(v) => setOpts((p) => ({ ...p, finalNewline: v }))}
                 label="Ensure final newline at end of output"
               />
             </div>
@@ -297,12 +337,12 @@ export function WhitespaceNormalizerTool() {
             <div className="mt-2 grid gap-2">
               <Toggle
                 checked={removeTrailing}
-                onChange={setRemoveTrailing}
+                onChange={(v) => setOpts((p) => ({ ...p, removeTrailing: v }))}
                 label="Remove trailing spaces (per line)"
               />
               <Toggle
                 checked={trimLines}
-                onChange={setTrimLines}
+                onChange={(v) => setOpts((p) => ({ ...p, trimLines: v }))}
                 label="Trim each line (leading + trailing)"
               />
             </div>
@@ -313,7 +353,11 @@ export function WhitespaceNormalizerTool() {
               Blank lines
             </div>
             <div className="mt-2 grid gap-2">
-              <Toggle checked={collapseBlanks} onChange={setCollapseBlanks} label="Collapse blank lines" />
+              <Toggle
+                checked={collapseBlanks}
+                onChange={(v) => setOpts((p) => ({ ...p, collapseBlanks: v }))}
+                label="Collapse blank lines"
+              />
               {collapseBlanks && (
                 <label className="grid gap-1 text-sm text-slate-800">
                   <span>Max consecutive blank lines (0–10)</span>
@@ -323,7 +367,12 @@ export function WhitespaceNormalizerTool() {
                     min={0}
                     max={10}
                     value={maxBlankLines}
-                    onChange={(e) => setMaxBlankLines(Number(e.target.value))}
+                    onChange={(e) =>
+                      setOpts((p) => ({
+                        ...p,
+                        maxBlankLines: Number(e.target.value),
+                      }))
+                    }
                   />
                 </label>
               )}
@@ -360,7 +409,8 @@ export function WhitespaceNormalizerTool() {
         <Textarea value={result.ok ? result.output : ""} readOnly rows={12} />
 
         <div className="text-xs text-slate-500">
-          Output stats — Lines: {outStats.lines} • Characters: {outStats.chars} • Bytes: {formatBytes(outStats.bytes)}
+          Output stats — Lines: {outStats.lines} • Characters: {outStats.chars} • Bytes:{" "}
+          {formatBytes(outStats.bytes)}
         </div>
       </div>
     </div>

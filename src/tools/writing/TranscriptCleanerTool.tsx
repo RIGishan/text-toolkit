@@ -5,6 +5,9 @@ import { Toggle } from "../../components/ui/Toggle";
 import { downloadTextFile } from "../../lib/download";
 import { useDebouncedValue } from "../../lib/useDebouncedValue";
 
+import { useToolContext } from "../../app/toolContext";
+import { useToolState } from "../../lib/useToolState";
+
 function normalizeNewlines(text: string): string {
   return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
 }
@@ -29,23 +32,12 @@ function normalizeSpeakerLabels(text: string): string {
     /^\s*([A-Za-z][A-Za-z0-9 _.'-]{0,40})\s*(?:\:|\-|\—|\–)\s+/gm,
     (_m, name) => {
       const n = String(name).trim().replace(/\s{2,}/g, " ");
-      // Title-case-ish: keep as-is but trim
       return `${n}: `;
     }
   );
 }
 
-const FILLER_WORDS = [
-  "um",
-  "uh",
-  "like",
-  "you know",
-  "i mean",
-  "sort of",
-  "kind of",
-  "actually",
-  "basically"
-];
+const FILLER_WORDS = ["um", "uh", "like", "you know", "i mean", "sort of", "kind of", "actually", "basically"];
 
 function removeFillers(text: string): string {
   // Conservative: remove fillers when surrounded by word boundaries, keeping punctuation spacing reasonable.
@@ -69,20 +61,30 @@ function tidyWhitespace(text: string): string {
   return out.trim() + "\n";
 }
 
-export function TranscriptCleanerTool() {
-  const [input, setInput] = useState(
-    `[00:01] SPEAKER 1 - Um, hello everyone.
+const SAMPLE = `[00:01] SPEAKER 1 - Um, hello everyone.
 (00:05) John Doe — like, I mean we should start now.
 00:12 Jane: Uh, yeah, basically the agenda is...
 00:20 - SPEAKER 1: You know, let's do it.
 
-[00:33] John Doe: Great!`
-  );
+[00:33] John Doe: Great!`;
 
-  const [stripTimestamps, setStripTimestamps] = useState(true);
-  const [normalizeSpeakers, setNormalizeSpeakers] = useState(true);
-  const [removeFillerWords, setRemoveFillerWords] = useState(false);
-  const [normalizeWhitespace, setNormalizeWhitespaceOpt] = useState(true);
+export function TranscriptCleanerTool() {
+  const { toolId } = useToolContext();
+
+  // Input is NOT part of recipes (users paste new transcripts all the time)
+  const [input, setInput] = useState(SAMPLE);
+
+  // Options ARE part of recipes
+  const DEFAULTS = {
+    stripTimestamps: true,
+    normalizeSpeakers: true,
+    removeFillerWords: false,
+    normalizeWhitespace: true,
+  };
+
+  const [opts, setOpts] = useToolState(toolId, DEFAULTS);
+
+  const { stripTimestamps, normalizeSpeakers, removeFillerWords, normalizeWhitespace } = opts;
 
   const debounced = useDebouncedValue(input, 150);
 
@@ -109,18 +111,8 @@ export function TranscriptCleanerTool() {
   }
 
   function reset() {
-    setInput(
-      `[00:01] SPEAKER 1 - Um, hello everyone.
-(00:05) John Doe — like, I mean we should start now.
-00:12 Jane: Uh, yeah, basically the agenda is...
-00:20 - SPEAKER 1: You know, let's do it.
-
-[00:33] John Doe: Great!`
-    );
-    setStripTimestamps(true);
-    setNormalizeSpeakers(true);
-    setRemoveFillerWords(false);
-    setNormalizeWhitespaceOpt(true);
+    setInput(SAMPLE);
+    setOpts(DEFAULTS);
   }
 
   return (
@@ -137,22 +129,38 @@ export function TranscriptCleanerTool() {
 
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-xl border border-slate-200 bg-white p-3">
-            <Toggle checked={stripTimestamps} onChange={setStripTimestamps} label="Remove timestamps" />
+            <Toggle
+              checked={stripTimestamps}
+              onChange={(v) => setOpts((p) => ({ ...p, stripTimestamps: v }))}
+              label="Remove timestamps"
+            />
             <div className="mt-1 text-xs text-slate-500">Catches common formats like [00:12], 00:12:34, etc.</div>
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-white p-3">
-            <Toggle checked={normalizeSpeakers} onChange={setNormalizeSpeakers} label="Normalize speaker labels" />
+            <Toggle
+              checked={normalizeSpeakers}
+              onChange={(v) => setOpts((p) => ({ ...p, normalizeSpeakers: v }))}
+              label="Normalize speaker labels"
+            />
             <div className="mt-1 text-xs text-slate-500">Converts “Name - …” → “Name: …” at line start.</div>
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-white p-3">
-            <Toggle checked={removeFillerWords} onChange={setRemoveFillerWords} label="Remove filler words (conservative)" />
+            <Toggle
+              checked={removeFillerWords}
+              onChange={(v) => setOpts((p) => ({ ...p, removeFillerWords: v }))}
+              label="Remove filler words (conservative)"
+            />
             <div className="mt-1 text-xs text-slate-500">Removes um/uh/like/you know/etc. (best-effort).</div>
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-white p-3">
-            <Toggle checked={normalizeWhitespace} onChange={setNormalizeWhitespaceOpt} label="Normalize whitespace" />
+            <Toggle
+              checked={normalizeWhitespace}
+              onChange={(v) => setOpts((p) => ({ ...p, normalizeWhitespace: v }))}
+              label="Normalize whitespace"
+            />
             <div className="mt-1 text-xs text-slate-500">Trims trailing spaces and collapses extra blank lines.</div>
           </div>
         </div>
