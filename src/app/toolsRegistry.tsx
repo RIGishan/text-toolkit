@@ -265,4 +265,4 @@ export function toolsByCategory(): Map<ToolCategory, ToolConfig[]> {
   for (const cat of CATEGORIES) map.set(cat, []);
   for (const tool of toolsRegistry) map.get(tool.category)!.push(tool);
   return map;
-}
+} 
