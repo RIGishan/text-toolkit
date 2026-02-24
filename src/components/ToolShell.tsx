@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-<<<<<<< HEAD
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ToolProvider } from "../app/toolContext";
 import {
@@ -37,25 +36,18 @@ function stableStringify(value: unknown): string {
 
   return JSON.stringify(normalize(value));
 }
-=======
->>>>>>> a38c6781ba02f0335e4b9de11228d87416afd174
 
 export function ToolShell({
   title,
   description,
   toolId,
-<<<<<<< HEAD
   children,
-=======
-  children
->>>>>>> a38c6781ba02f0335e4b9de11228d87416afd174
 }: {
   title: string;
   description: string;
   toolId: string;
   children: ReactNode;
 }) {
-<<<<<<< HEAD
   const [recipes, setRecipes] = useState<ToolRecipe[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
 
@@ -330,21 +322,3 @@ export function ToolShell({
     </ToolProvider>
   );
 }
-=======
-  return (
-    <section className="rounded-2xl border border-slate-200 bg-white shadow-soft" aria-label={title}>
-      <header className="border-b border-slate-200 px-6 py-5">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-lg font-semibold tracking-tight text-slate-900">{title}</h1>
-          <p className="text-sm text-slate-600">{description}</p>
-          <p className="text-xs text-slate-500">
-            Runs locally in your browser (no uploads) • <span className="font-mono">{toolId}</span>
-          </p>
-        </div>
-      </header>
-
-      <div className="p-6">{children}</div>
-    </section>
-  );
-}
->>>>>>> a38c6781ba02f0335e4b9de11228d87416afd174

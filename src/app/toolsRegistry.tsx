@@ -62,6 +62,15 @@ export const toolsRegistry: ToolConfig[] = [
     defaultState: {},
   },
   {
+    id: "dev/json-to-table",
+    category: "Dev",
+    name: "JSON to Table Viewer",
+    description: "Render JSON data in a searchable table with column filters.",
+    keywords: ["json", "table", "viewer", "search", "filter", "rows", "columns"],
+    Component: JsonTableTool,
+    defaultState: {},
+  },
+  {
     id: "dev/url-encode-decode",
     category: "Dev",
     name: "URL Encode/Decode + Query Parser",
@@ -90,7 +99,7 @@ export const toolsRegistry: ToolConfig[] = [
   },
   {
     id: "dev/hash-generator",
-    category: "Dev",
+    category: "Security",
     name: "Hash Generator (SHA-256 / SHA-512)",
     description: "Generate SHA-256 and SHA-512 hashes locally using the Web Crypto API.",
     keywords: ["hash", "sha256", "sha512", "crypto", "digest", "checksum"],
@@ -99,7 +108,7 @@ export const toolsRegistry: ToolConfig[] = [
   },
   {
     id: "dev/jwt-inspector",
-    category: "Dev",
+    category: "Security",
     name: "JWT Decoder / Inspector",
     description: "Decode JWT header/payload locally and inspect claims (no signature verification).",
     keywords: ["jwt", "token", "decode", "inspector", "exp", "claims", "base64url"],
@@ -113,15 +122,6 @@ export const toolsRegistry: ToolConfig[] = [
     description: "Test patterns, highlight matches, inspect groups, and use common regex templates.",
     keywords: ["regex", "regexp", "match", "highlight", "groups", "escape", "unescape"],
     Component: RegexSuiteTool,
-    defaultState: {},
-  },
-  {
-    id: "dev/json-to-table",
-    category: "Dev",
-    name: "JSON to Table Viewer",
-    description: "Render JSON data in a searchable table with column filters.",
-    keywords: ["json", "table", "viewer", "search", "filter", "rows", "columns"],
-    Component: JsonTableTool,
     defaultState: {},
   },
   {
