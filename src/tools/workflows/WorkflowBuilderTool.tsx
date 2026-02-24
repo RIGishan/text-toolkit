@@ -138,7 +138,7 @@ export function WorkflowBuilderTool() {
   return (
     <div className="grid gap-6">
       {/* Top bar: Save/Load workflows */}
-      <div className="grid gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+      <div className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-4">
         <div className="text-sm font-semibold text-slate-900">Workflow</div>
 
         <div className="flex flex-wrap gap-2 items-center">

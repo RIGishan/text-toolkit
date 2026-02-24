@@ -6,3 +6,44 @@
   outline: 2px solid rgb(59 130 246);
   outline-offset: 2px;
 }
+/* ===== Global Typography Upgrade ===== */
+
+html {
+  font-size: 16px; /* modern SaaS base size */
+}
+
+body {
+  font-size: 1rem;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Title scroll-in-place (no tooltip box) */
+.tt-marquee-wrap {
+  width: 100%;
+  min-width: 0;
+  white-space: nowrap;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  /* allow horizontal scroll programmatically */
+  overflow-x: auto;
+  scrollbar-width: none; /* firefox */
+}
+
+.tt-marquee-wrap::-webkit-scrollbar {
+  display: none; /* chrome/safari */
+}
+
+.tt-marquee-inner {
+  display: inline-block;
+  white-space: nowrap;
+  padding-right: 16px; /* breathing room so last chars aren’t glued */
+}
+
+/* when hovering, remove ellipsis so you stop seeing "..." */
+.tt-marquee-wrap.tt-marquee-hover {
+  text-overflow: clip;
+}
