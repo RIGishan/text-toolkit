@@ -386,7 +386,7 @@ export function SocialPostComposerTool() {
           </div>
 
           {/* small, single-line buttons */}
-          <div className="flex flex-nowrap gap-2 overflow-x-auto">
+          <div className="flex flex-nowrap gap-2">
             <Button type="button" onClick={regenerateDraft} className="h-8 px-2 text-xs rounded-lg whitespace-nowrap">
               Generate Draft
             </Button>
